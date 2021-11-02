@@ -1,9 +1,12 @@
 
 #ifndef __LCD__
 #define __LCD__
-
-#include "tm4c123gh6pm.h"
+#include <stdint.h>
+#include "TM4C123GH6PM.h"
 #include "string.h"
+#include "LCD_Bits.h"
+
+
 
 
 /* 
@@ -13,15 +16,24 @@
 */ 
 
 
+typedef GPIOA_Type GPIO_TypeDef;
+
+typedef struct 
+{
+		GPIO_TypeDef   * Port ;
+		uint8_t          Pin  ;
+	}LCD_bit;
+
+typedef struct   
+{
+	LCD_bit LcdBits[7];
+}LcdBitSelect_t;
 
 
 
-/* no need to LCD_RW pin always write so connect this pin to ground */
-#define LCD_RS 0x04  
-#define LCD_EN 0x08   
+extern LcdBitSelect_t LcdBitSelect ;
 
 
-#define LCD_PORT 					GPIOA /* define which port lcd connected to */
 
 
 
@@ -130,7 +142,7 @@ void LCD_Send_String_WithLoc(uint8_t loc_x_, uint8_t loc_y_, char *StringOfChara
  * param. : NumberOfDigits number of digits of the integer number that you want to display
  * return : void 
  */
-void LCD_Send_Integer_WithLoc(uint8_t loc_x_, uint8_t loc_y_, uint64_t IntegerToDisplay);
+void LCD_Send_Integer_WithLoc(uint8_t loc_x_, uint8_t loc_y_, uint32_t IntegerToDisplay);
 
 /*
  * brief  : this function used to send an floating point number to LCD with the chosen location 
@@ -145,14 +157,7 @@ void LCD_Send_Float_withloc(uint8_t x, uint8_t y ,  float FlaotToDisplay ,uint16
 
 
 
-/*
- * brief  : this function used to send an 64 bit integer to LCD with the chosen location 
- * param. :  y  is specify y axises location start from 1-->16
- * param. :  x  is specify x axises location start from 1-->16
- * param. : IntegerToDisplay this is the integer value that you want to display
- * return : void 
- */
-void LCD_Send_Integer_WithLoc(uint8_t loc_x_, uint8_t loc_y_, uint64_t IntegerToDisplay);
+
 
 
 
