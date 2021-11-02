@@ -12,7 +12,7 @@ static uint8_t column_position [2] = {0x80,0xc0};
  * param. : BUFF pointer to buffer to hold the converted numbers
  * return : void 
  */
-static void int_to_str(uint64_t num , uint8_t* BUFF);
+static void int_to_str(uint32_t num , uint8_t* BUFF);
 	
 
 
@@ -31,16 +31,23 @@ static void LCD_Triger_Enable(void);
  */
 static void LCD_Send_4BitData(uint8_t data)
 {
-	LCD_PORT->DATA |= ((data)& 0XF0);
-  LCD_Triger_Enable();
-	LCD_PORT->DATA &= 0X0F;
-	LCD_PORT->DATA |= ((data<<4)& 0xf0);
-  LCD_Triger_Enable();
-	LCD_PORT->DATA = 0X00;
-	if(data <= 0x04)
-	delayMs(2);
-	else 
-	delayUs(400);
+	
+		for(int i =3 ; i < 7 ;i++)		
+		{	
+			LcdBitSelect.LcdBits[i].Port->DATA   &= ~LcdBitSelect.LcdBits[i].Pin ;
+			LcdBitSelect.LcdBits[i].Port->DATA   |= (((data)&(1<<(i+1)))>>(i+1))<<(31-__clz(LcdBitSelect.LcdBits[i].Pin));
+		}
+		LCD_Triger_Enable();
+		int x =0 ;
+		for(int i =3 ; i < 7 ;i++)		
+		{	
+			x = __clz(LcdBitSelect.LcdBits[i].Pin);
+			LcdBitSelect.LcdBits[i].Port->DATA   &= ~LcdBitSelect.LcdBits[i].Pin ;
+			LcdBitSelect.LcdBits[i].Port->DATA   |= (((data)&(1<<(i-3)))>>(i-3))<<(31-__clz(LcdBitSelect.LcdBits[i].Pin));
+		}
+		LCD_Triger_Enable();		
+		
+
 } /* END_FUN LCD_Send_4BitData()*/
 
 
@@ -52,9 +59,9 @@ static void LCD_Send_4BitData(uint8_t data)
  */
 static void LCD_Triger_Enable(void)
 {
-	LCD_PORT->DATA |= LCD_EN;
+	LcdBitSelect.LcdBits[LCD_BIT_E_PIN].Port->DATA  |=  LcdBitSelect.LcdBits[LCD_BIT_E_PIN].Pin;  /* remmeber to always connect LCD_RW to ground */
 	delayUs(400);
-	LCD_PORT->DATA &=~LCD_EN;
+	LcdBitSelect.LcdBits[LCD_BIT_E_PIN].Port->DATA  &=~ LcdBitSelect.LcdBits[LCD_BIT_E_PIN].Pin;  /* remmeber to always connect LCD_RW to ground */
 	delayUs(400);
 	
 } /* END_FUN LCD_Triger_Enable()*/
@@ -69,7 +76,7 @@ static void LCD_Triger_Enable(void)
  */  
 void LCD_Send_Character_CurrLoc(uint8_t character)
 {
-	LCD_PORT->DATA  |=LCD_RS;
+	LcdBitSelect.LcdBits[LCD_BIT_RS_PIN].Port->DATA  |= LcdBitSelect.LcdBits[LCD_BIT_RS_PIN].Pin;  /* remmeber to always connect LCD_RW to ground */
 	delayMs(1);
 	LCD_Send_4BitData(character);
 	
@@ -87,7 +94,7 @@ void LCD_Send_Character_CurrLoc(uint8_t character)
 void LCD_Send_Command(uint8_t command)
 {
 	
-	LCD_PORT->DATA  &=~LCD_RS;  /* remmeber to always connect LCD_RW to ground */
+	LcdBitSelect.LcdBits[LCD_BIT_RS_PIN].Port->DATA  &=~  LcdBitSelect.LcdBits[LCD_BIT_RS_PIN].Pin; /* remmeber to always connect LCD_RW to ground */
 	LCD_Send_4BitData(command);
 	
 	
@@ -104,9 +111,12 @@ void LCD_Initializaion(void)
 {
 SYSCTL->RCGCGPIO |= 0x01;    /* enable GPIOA clock */
 __NOP();__NOP();__NOP();    /* wait 3 cycles */
-LCD_PORT->DEN = 0xff;       /* set GPIOA as digital output */
-LCD_PORT->DIR = 0xff;       /* set GPIOA pins as output pins */
 
+	for(int i = 0;i< 7 ;i++)
+	{
+		LcdBitSelect.LcdBits[i].Port->DEN |= LcdBitSelect.LcdBits[i].Pin ;
+		LcdBitSelect.LcdBits[i].Port->DIR |= LcdBitSelect.LcdBits[i].Pin ;
+	}
 	
 	delayMs(20);
 	
@@ -192,7 +202,7 @@ void LCD_Send_String_With_CurrLoc(char *StringOfCharacters)
  * param. : IntegerToDisplay this is the integer value that you want to display
  * return : void 
  */
-void LCD_Send_Integer_WithLoc(uint8_t y, uint8_t x, uint64_t IntegerToDisplay)
+void LCD_Send_Integer_WithLoc(uint8_t y, uint8_t x, uint32_t IntegerToDisplay)
 {
 	
 	
@@ -234,7 +244,7 @@ void LCD_Send_Integer_CurrLoc(uint64_t IntegerToDisplay)
  * param. : BUFF pointer to buffer to hold the converted numbers
  * return : void 
  */
-static void int_to_str(uint64_t num , uint8_t* BUFF)
+static void int_to_str(uint32_t num , uint8_t* BUFF)
 {
 		uint32_t num1=num;
 	  uint16_t  len=0,rem=0;
@@ -271,9 +281,13 @@ static void int_to_str(uint64_t num , uint8_t* BUFF)
  */
 void LCD_Send_Float_Withloc(uint8_t y, uint8_t x ,  float FlaotToDisplay , uint16_t precision)
 {
+		uint16_t intValue =0;
+	float diffValue=0;
+	double after=10.0;
+	uint16_t decimalValue ;
 	LCD_Goto_Location(y,x);
 	
-	double after=10.0;
+
 
 	if (precision == 1 )		after = after *1;  /* chose the precision */
 
@@ -287,9 +301,9 @@ void LCD_Send_Float_Withloc(uint8_t y, uint8_t x ,  float FlaotToDisplay , uint1
 
 	else if (precision==6)	after = 1000000.0;
 
-	uint16_t intValue = (uint16_t)FlaotToDisplay;                    /* calculate the int value */
-	float diffValue = FlaotToDisplay - (float)intValue;              
-	uint16_t decimalValue = (uint16_t)(diffValue * after);			  /* calculate the float value */
+	intValue = (uint16_t)FlaotToDisplay;                    /* calculate the int value */
+	diffValue = FlaotToDisplay - (float)intValue;              
+	decimalValue = (uint16_t)((double)diffValue * after);			  /* calculate the float value */
 	
 	
 	LCD_Send_Integer_CurrLoc(intValue);
